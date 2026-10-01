@@ -12,6 +12,7 @@ import {
 } from "../validations/organization.validation";
 import { authenticationMiddleware } from "../middleware/authentication.middleware";
 import { errors } from "../lib/app-errors";
+import { validate } from "../lib/validate";
 
 export async function organizationRoutes(app: FastifyInstance) {
   await app.register(async (protectedRoute) => {
@@ -41,13 +42,11 @@ export async function organizationRoutes(app: FastifyInstance) {
     protectedRoute.get(
       "/organizations/:organizationId",
       async (request, reply) => {
-        const parsedParams = organizationIdSchema.safeParse(request.params);
-
-        if (!parsedParams.success) {
-          throw errors.invalidOrganizationId();
-        }
-
-        const { organizationId } = parsedParams.data;
+        const { organizationId } = validate(
+          organizationIdSchema,
+          request.params,
+          errors.invalidOrganizationId
+        );
 
         const [organization] = await database
           .select({
@@ -79,13 +78,11 @@ export async function organizationRoutes(app: FastifyInstance) {
     );
 
     protectedRoute.post("/organizations", async (request, reply) => {
-      const parsedBody = createOrganizationSchema.safeParse(request.body);
-
-      if (!parsedBody.success) {
-        throw errors.invalidOrganizationData();
-      }
-
-      const { name } = parsedBody.data;
+      const { name } = validate(
+        createOrganizationSchema,
+        request.body,
+        errors.invalidOrganizationData
+      );
 
       const result = await database.transaction(async (org) => {
         const [organization] = await org
@@ -110,20 +107,17 @@ export async function organizationRoutes(app: FastifyInstance) {
     protectedRoute.patch(
       "/organizations/:organizationId",
       async (request, reply) => {
-        const parsedParams = organizationIdSchema.safeParse(request.params);
+        const { organizationId } = validate(
+          organizationIdSchema,
+          request.params,
+          errors.invalidOrganizationId
+        );
 
-        if (!parsedParams.success) {
-          throw errors.invalidOrganizationId();
-        }
-
-        const parsedBody = updateOrganizationSchema.safeParse(request.body);
-
-        if (!parsedBody.success) {
-          throw errors.invalidOrganizationData();
-        }
-
-        const { organizationId } = parsedParams.data;
-        const { name } = parsedBody.data;
+        const { name } = validate(
+          updateOrganizationSchema,
+          request.body,
+          errors.invalidOrganizationData
+        );
 
         const [membership] = await database
           .select({
@@ -164,33 +158,15 @@ export async function organizationRoutes(app: FastifyInstance) {
     protectedRoute.get(
       "/organizations/:organizationId/members",
       async (request, reply) => {
-        const parsedParams = organizationIdSchema.safeParse(request.params);
+        const { organizationId } = validate(
+          organizationIdSchema,
+          request.params,
+          errors.invalidOrganizationId
+        );
 
-        if (!parsedParams.success) {
-          throw errors.invalidOrganizationId();
-        }
-
-        const { organizationId } = parsedParams.data;
-
-        const [membership] = await database
+        const [organization] = await database
           .select({
-            id: memberships.id,
-          })
-          .from(memberships)
-          .where(
-            and(
-              eq(memberships.userId, request.user.id),
-              eq(memberships.organizationId, organizationId)
-            )
-          )
-          .limit(1);
-
-        if (!membership) {
-          throw errors.organizationNotFound();
-        }
-
-        const [orgName] = await database
-          .select({
+            id: organizations.id,
             name: organizations.name,
           })
           .from(memberships)
@@ -206,6 +182,10 @@ export async function organizationRoutes(app: FastifyInstance) {
           )
           .limit(1);
 
+        if (!organization) {
+          throw errors.organizationNotFound();
+        }
+
         const members = await database
           .select({
             userId: users.id,
@@ -219,7 +199,7 @@ export async function organizationRoutes(app: FastifyInstance) {
           .where(eq(memberships.organizationId, organizationId));
 
         return reply.send({
-          organization: orgName.name,
+          organization: organization.name,
           members,
         });
       }
@@ -228,18 +208,17 @@ export async function organizationRoutes(app: FastifyInstance) {
     protectedRoute.post(
       "/organizations/:organizationId/members",
       async (request, reply) => {
-        const parsedParams = organizationIdSchema.safeParse(request.params);
-        if (!parsedParams.success) {
-          throw errors.invalidOrganizationId();
-        }
+        const { organizationId } = validate(
+          organizationIdSchema,
+          request.params,
+          errors.invalidOrganizationId
+        );
 
-        const parsedBody = addOrganizationMemberSchema.safeParse(request.body);
-        if (!parsedBody.success) {
-          throw errors.invalidOrganizationData();
-        }
-
-        const { organizationId } = parsedParams.data;
-        const { email, role } = parsedBody.data;
+        const { email, role } = validate(
+          addOrganizationMemberSchema,
+          request.body,
+          errors.invalidOrganizationData
+        );
 
         const [requesterMembership] = await database
           .select({
@@ -317,26 +296,19 @@ export async function organizationRoutes(app: FastifyInstance) {
     );
 
     protectedRoute.patch(
-      "/organizations/:organizationId/members/:userId",
+      "/organizations/:organizationId/members/:userId/role",
       async (request, reply) => {
-        const parsedParams = organizationMemberParamsSchema.safeParse(
-          request.params
+        const { organizationId, userId } = validate(
+          organizationMemberParamsSchema,
+          request.params,
+          errors.invalidOrganizationId
         );
 
-        if (!parsedParams.success) {
-          throw errors.invalidOrganizationId();
-        }
-
-        const parsedBody = updateOrganizationMemberSchema.safeParse(
-          request.body
+        const { role } = validate(
+          updateOrganizationMemberSchema,
+          request.body,
+          errors.invalidOrganizationData
         );
-
-        if (!parsedBody.success) {
-          throw errors.invalidOrganizationData();
-        }
-
-        const { organizationId, userId } = parsedParams.data;
-        const { role } = parsedBody.data;
 
         const [requesterMembership] = await database
           .select({
@@ -411,15 +383,11 @@ export async function organizationRoutes(app: FastifyInstance) {
     protectedRoute.delete(
       "/organizations/:organizationId/members/:userId",
       async (request, reply) => {
-        const parsedParams = organizationMemberParamsSchema.safeParse(
-          request.params
+        const { organizationId, userId } = validate(
+          organizationMemberParamsSchema,
+          request.params,
+          errors.invalidOrganizationId
         );
-
-        if (!parsedParams.success) {
-          throw errors.invalidOrganizationId();
-        }
-
-        const { organizationId, userId } = parsedParams.data;
 
         const [requesterMembership] = await database
           .select({

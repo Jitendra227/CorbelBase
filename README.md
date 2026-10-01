@@ -28,3 +28,6 @@ This repository is the starting point for the TeamOps project. Add project-speci
 ## Development
 
 No build or development commands have been configured yet.
+
+todos: 
+task creation concurrency

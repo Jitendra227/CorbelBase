@@ -22,6 +22,34 @@
       "when": 1790748188105,
       "tag": "0002_eager_speed",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790860243342,
+      "tag": "0003_gifted_lord_hawal",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790864403801,
+      "tag": "0004_fine_doctor_faustus",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790867164261,
+      "tag": "0005_rare_starjammers",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790867540445,
+      "tag": "0006_confused_robin_chapel",
+      "breakpoints": true
     }
   ]
 }

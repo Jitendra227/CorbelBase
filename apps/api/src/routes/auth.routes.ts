@@ -6,21 +6,16 @@ import { authSchema, loginSchema } from "../validations/auth.validation";
 import { hashPassword, verifyPassword } from "../lib/passwords";
 import { createSession, deleteSession } from "../services/session";
 import { authenticationMiddleware } from "../middleware/authentication.middleware";
+import { errors } from "../lib/app-errors";
+import { validate } from "../lib/validate";
 
 export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/register", async (request, reply) => {
-    const parsedBody = authSchema.safeParse(request.body);
-
-    if (!parsedBody.success) {
-      return reply.status(400).send({
-        error: {
-          code: "INVALID_REQUEST",
-          message: "Invalid registration data",
-        },
-      });
-    }
-
-    const { name, email, password } = parsedBody.data;
+    const { name, email, password } = validate(
+      authSchema,
+      request.body,
+      errors.invalidRegistrationData
+    );
 
     const existingUser = await database
       .select({ id: users.id })
@@ -29,12 +24,7 @@ export async function authRoutes(app: FastifyInstance) {
       .limit(1);
 
     if (existingUser.length > 0) {
-      return reply.status(409).send({
-        error: {
-          code: "USER_EXISTS",
-          message: "A user with this email already exists",
-        },
-      });
+      throw errors.userExists();
     }
 
     const passwordHash = await hashPassword(password);
@@ -52,18 +42,11 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   app.post("/auth/login", async (request, reply) => {
-    const parsedBody = loginSchema.safeParse(request.body);
-
-    if (!parsedBody.success) {
-      return reply.status(400).send({
-        error: {
-          code: "INVALID_REQUEST",
-          message: "Invalid login data",
-        },
-      });
-    }
-
-    const { email, password } = parsedBody.data;
+    const { email, password } = validate(
+      loginSchema,
+      request.body,
+      errors.invalidLoginData
+    );
 
     const [user] = await database
       .select({
@@ -77,23 +60,13 @@ export async function authRoutes(app: FastifyInstance) {
       .limit(1);
 
     if (!user) {
-      return reply.status(401).send({
-        error: {
-          code: "INVALID_CREDENTIALS",
-          message: "Invalid email or password",
-        },
-      });
+      throw errors.invalidCredentials();
     }
 
     const validPassword = await verifyPassword(user.passwordHash, password);
 
     if (!validPassword) {
-      return reply.status(401).send({
-        error: {
-          code: "INVALID_CREDENTIALS",
-          message: "Invalid email or password",
-        },
-      });
+      throw errors.invalidCredentials();
     }
 
     const session = await createSession(user.id);
@@ -136,15 +109,6 @@ export async function authRoutes(app: FastifyInstance) {
     await authenticationMiddleware(protectedRoutes);
 
     protectedRoutes.get("/auth/me", async (request, reply) => {
-      if (!request.user) {
-        return reply.status(401).send({
-          error: {
-            code: "UNAUTHORIZED",
-            message: "Authentication required",
-          },
-        });
-      }
-
       const [user] = await database
         .select({
           id: users.id,
@@ -156,12 +120,7 @@ export async function authRoutes(app: FastifyInstance) {
         .limit(1);
 
       if (!user) {
-        return reply.status(401).send({
-          error: {
-            code: "UNAUTHORIZED",
-            message: "Authentication required",
-          },
-        });
+        throw errors.unauthorized();
       }
 
       return reply.send({ user });
