@@ -1,28 +1,23 @@
 import { FastifyInstance } from "fastify";
 import { and, eq } from "drizzle-orm";
 import { database } from "../lib/database";
-import { organizations, memberships } from "../db/schema";
+import { memberships, organizations, users } from "../db/schema";
 import {
+  addOrganizationMemberSchema,
   createOrganizationSchema,
   organizationIdSchema,
+  organizationMemberParamsSchema,
+  updateOrganizationMemberSchema,
   updateOrganizationSchema,
 } from "../validations/organization.validation";
 import { authenticationMiddleware } from "../middleware/authentication.middleware";
+import { errors } from "../lib/app-errors";
 
 export async function organizationRoutes(app: FastifyInstance) {
   await app.register(async (protectedRoute) => {
     await authenticationMiddleware(protectedRoute);
 
     protectedRoute.get("/organizations", async (request, reply) => {
-      if (!request.user) {
-        return reply.status(401).send({
-          error: {
-            code: "UNAUTHORIZED",
-            message: "Authentication Required",
-          },
-        });
-      }
-
       const userOrganizations = await database
         .select({
           id: organizations.id,
@@ -46,24 +41,10 @@ export async function organizationRoutes(app: FastifyInstance) {
     protectedRoute.get(
       "/organizations/:organizationId",
       async (request, reply) => {
-        if (!request.user) {
-          return reply.status(401).send({
-            error: {
-              code: "UNAUTHORIZED",
-              message: "Authentication Required",
-            },
-          });
-        }
-
         const parsedParams = organizationIdSchema.safeParse(request.params);
 
         if (!parsedParams.success) {
-          return reply.status(400).send({
-            error: {
-              code: "INVALID_REQUEST",
-              message: "Invalid organization ID",
-            },
-          });
+          throw errors.invalidOrganizationId();
         }
 
         const { organizationId } = parsedParams.data;
@@ -90,12 +71,7 @@ export async function organizationRoutes(app: FastifyInstance) {
           .limit(1);
 
         if (!organization) {
-          return reply.status(404).send({
-            error: {
-              code: "ORGANIZATION_NOT_FOUND",
-              message: "Organization not found",
-            },
-          });
+          throw errors.organizationNotFound();
         }
 
         return reply.send({ organization });
@@ -106,21 +82,7 @@ export async function organizationRoutes(app: FastifyInstance) {
       const parsedBody = createOrganizationSchema.safeParse(request.body);
 
       if (!parsedBody.success) {
-        return reply.status(400).send({
-          error: {
-            code: "INVALID_REQUEST",
-            message: "Invalid organization data",
-          },
-        });
-      }
-
-      if (!request.user) {
-        return reply.status(401).send({
-          error: {
-            code: "UNAUTHORIZED",
-            message: "Authentication Required",
-          },
-        });
+        throw errors.invalidOrganizationData();
       }
 
       const { name } = parsedBody.data;
@@ -132,7 +94,7 @@ export async function organizationRoutes(app: FastifyInstance) {
           .returning();
 
         await org.insert(memberships).values({
-          userId: request.user!.id,
+          userId: request.user.id,
           organizationId: organization.id,
           role: "owner",
         });
@@ -148,35 +110,16 @@ export async function organizationRoutes(app: FastifyInstance) {
     protectedRoute.patch(
       "/organizations/:organizationId",
       async (request, reply) => {
-        if (!request.user) {
-          return reply.status(401).send({
-            error: {
-              code: "UNAUTHORIZED",
-              message: "Authentication required",
-            },
-          });
-        }
-
         const parsedParams = organizationIdSchema.safeParse(request.params);
 
         if (!parsedParams.success) {
-          return reply.status(400).send({
-            error: {
-              code: "INVALID_REQUEST",
-              message: "Invalid organization ID",
-            },
-          });
+          throw errors.invalidOrganizationId();
         }
 
         const parsedBody = updateOrganizationSchema.safeParse(request.body);
 
         if (!parsedBody.success) {
-          return reply.status(400).send({
-            error: {
-              code: "INVALID_REQUEST",
-              message: "Invalid organization data",
-            },
-          });
+          throw errors.invalidOrganizationData();
         }
 
         const { organizationId } = parsedParams.data;
@@ -196,21 +139,11 @@ export async function organizationRoutes(app: FastifyInstance) {
           .limit(1);
 
         if (!membership) {
-          return reply.status(404).send({
-            error: {
-              code: "ORGANIZATION_NOT_FOUND",
-              message: "Organization not found",
-            },
-          });
+          throw errors.organizationNotFound();
         }
 
         if (membership.role !== "owner" && membership.role !== "admin") {
-          return reply.status(403).send({
-            error: {
-              code: "FORBIDDEN",
-              message: "You do not have permission to update this organization",
-            },
-          });
+          throw errors.forbidden();
         }
 
         const [organization] = await database
@@ -224,6 +157,328 @@ export async function organizationRoutes(app: FastifyInstance) {
 
         return reply.send({
           organization,
+        });
+      }
+    );
+
+    protectedRoute.get(
+      "/organizations/:organizationId/members",
+      async (request, reply) => {
+        const parsedParams = organizationIdSchema.safeParse(request.params);
+
+        if (!parsedParams.success) {
+          throw errors.invalidOrganizationId();
+        }
+
+        const { organizationId } = parsedParams.data;
+
+        const [membership] = await database
+          .select({
+            id: memberships.id,
+          })
+          .from(memberships)
+          .where(
+            and(
+              eq(memberships.userId, request.user.id),
+              eq(memberships.organizationId, organizationId)
+            )
+          )
+          .limit(1);
+
+        if (!membership) {
+          throw errors.organizationNotFound();
+        }
+
+        const [orgName] = await database
+          .select({
+            name: organizations.name,
+          })
+          .from(memberships)
+          .innerJoin(
+            organizations,
+            eq(memberships.organizationId, organizations.id)
+          )
+          .where(
+            and(
+              eq(memberships.userId, request.user.id),
+              eq(memberships.organizationId, organizationId)
+            )
+          )
+          .limit(1);
+
+        const members = await database
+          .select({
+            userId: users.id,
+            name: users.name,
+            email: users.email,
+            role: memberships.role,
+            joinedAt: memberships.createdAt,
+          })
+          .from(memberships)
+          .innerJoin(users, eq(memberships.userId, users.id))
+          .where(eq(memberships.organizationId, organizationId));
+
+        return reply.send({
+          organization: orgName.name,
+          members,
+        });
+      }
+    );
+
+    protectedRoute.post(
+      "/organizations/:organizationId/members",
+      async (request, reply) => {
+        const parsedParams = organizationIdSchema.safeParse(request.params);
+        if (!parsedParams.success) {
+          throw errors.invalidOrganizationId();
+        }
+
+        const parsedBody = addOrganizationMemberSchema.safeParse(request.body);
+        if (!parsedBody.success) {
+          throw errors.invalidOrganizationData();
+        }
+
+        const { organizationId } = parsedParams.data;
+        const { email, role } = parsedBody.data;
+
+        const [requesterMembership] = await database
+          .select({
+            role: memberships.role,
+          })
+          .from(memberships)
+          .where(
+            and(
+              eq(memberships.userId, request.user.id),
+              eq(memberships.organizationId, organizationId)
+            )
+          )
+          .limit(1);
+
+        if (!requesterMembership) {
+          throw errors.organizationNotFound();
+        }
+
+        if (
+          requesterMembership.role !== "owner" &&
+          requesterMembership.role !== "admin"
+        ) {
+          throw errors.forbidden();
+        }
+
+        const [user] = await database
+          .select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+          })
+          .from(users)
+          .where(eq(users.email, email))
+          .limit(1);
+
+        if (!user) {
+          throw errors.userNotFound();
+        }
+
+        const [existingMembership] = await database
+          .select({
+            id: memberships.id,
+          })
+          .from(memberships)
+          .where(
+            and(
+              eq(memberships.userId, user.id),
+              eq(memberships.organizationId, organizationId)
+            )
+          )
+          .limit(1);
+
+        if (existingMembership) {
+          throw errors.alreadyMember();
+        }
+
+        const [membership] = await database
+          .insert(memberships)
+          .values({
+            userId: user.id,
+            organizationId,
+            role,
+          })
+          .returning();
+
+        return reply.status(201).send({
+          message: "member added to organization",
+          member: {
+            ...user,
+            role: membership.role,
+            joinedAt: membership.createdAt,
+          },
+        });
+      }
+    );
+
+    protectedRoute.patch(
+      "/organizations/:organizationId/members/:userId",
+      async (request, reply) => {
+        const parsedParams = organizationMemberParamsSchema.safeParse(
+          request.params
+        );
+
+        if (!parsedParams.success) {
+          throw errors.invalidOrganizationId();
+        }
+
+        const parsedBody = updateOrganizationMemberSchema.safeParse(
+          request.body
+        );
+
+        if (!parsedBody.success) {
+          throw errors.invalidOrganizationData();
+        }
+
+        const { organizationId, userId } = parsedParams.data;
+        const { role } = parsedBody.data;
+
+        const [requesterMembership] = await database
+          .select({
+            role: memberships.role,
+          })
+          .from(memberships)
+          .where(
+            and(
+              eq(memberships.userId, request.user.id),
+              eq(memberships.organizationId, organizationId)
+            )
+          )
+          .limit(1);
+
+        if (!requesterMembership) {
+          throw errors.organizationNotFound();
+        }
+
+        if (
+          requesterMembership.role !== "owner" &&
+          requesterMembership.role !== "admin"
+        ) {
+          throw errors.forbidden();
+        }
+
+        const [targetMembership] = await database
+          .select({
+            id: memberships.id,
+            role: memberships.role,
+          })
+          .from(memberships)
+          .where(
+            and(
+              eq(memberships.userId, userId),
+              eq(memberships.organizationId, organizationId)
+            )
+          )
+          .limit(1);
+
+        if (!targetMembership) {
+          throw errors.userNotFound();
+        }
+
+        // Don't allow changing the owner's role
+        if (targetMembership.role === "owner") {
+          throw errors.forbidden(
+            "The organization owner role cannot be changed"
+          );
+        }
+
+        // Admin cannot promote someone to admin
+        if (requesterMembership.role === "admin" && role === "admin") {
+          throw errors.forbidden(
+            "Only the organization owner can assign the admin role"
+          );
+        }
+
+        const [updatedMembership] = await database
+          .update(memberships)
+          .set({
+            role,
+          })
+          .where(eq(memberships.id, targetMembership.id))
+          .returning();
+        return reply.send({
+          message: "member role updated",
+          membership: updatedMembership,
+        });
+      }
+    );
+
+    protectedRoute.delete(
+      "/organizations/:organizationId/members/:userId",
+      async (request, reply) => {
+        const parsedParams = organizationMemberParamsSchema.safeParse(
+          request.params
+        );
+
+        if (!parsedParams.success) {
+          throw errors.invalidOrganizationId();
+        }
+
+        const { organizationId, userId } = parsedParams.data;
+
+        const [requesterMembership] = await database
+          .select({
+            role: memberships.role,
+          })
+          .from(memberships)
+          .where(
+            and(
+              eq(memberships.userId, request.user.id),
+              eq(memberships.organizationId, organizationId)
+            )
+          )
+          .limit(1);
+        if (!requesterMembership) {
+          throw errors.organizationNotFound();
+        }
+
+        if (
+          requesterMembership.role !== "owner" &&
+          requesterMembership.role !== "admin"
+        ) {
+          throw errors.forbidden();
+        }
+
+        const [targetMembership] = await database
+          .select({
+            id: memberships.id,
+            role: memberships.role,
+          })
+          .from(memberships)
+          .where(
+            and(
+              eq(memberships.userId, userId),
+              eq(memberships.organizationId, organizationId)
+            )
+          )
+          .limit(1);
+
+        if (!targetMembership) {
+          throw errors.userNotFound();
+        }
+
+        if (targetMembership.role === "owner") {
+          throw errors.forbidden("The organization owner cannot be removed");
+        }
+
+        if (
+          requesterMembership.role === "admin" &&
+          targetMembership.role === "admin"
+        ) {
+          throw errors.forbidden("Admins cannot remove other admins");
+        }
+
+        await database
+          .delete(memberships)
+          .where(eq(memberships.id, targetMembership.id));
+
+        return reply.send({
+          message: "member removed",
         });
       }
     );
