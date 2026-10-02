@@ -1,5 +1,6 @@
 import {
   integer,
+  index,
   pgEnum,
   pgTable,
   timestamp,
@@ -10,6 +11,7 @@ import {
 
 import { projects } from "./projects";
 import { users } from "./users";
+import { sprints } from "./sprints";
 
 export const taskType = pgEnum("task_type", [
   "feature",
@@ -48,6 +50,9 @@ export const tasks = pgTable(
     number: integer("number").notNull(),
     key: varchar("key", { length: 30 }).notNull(),
     type: taskType("type").notNull().default("task"),
+    sprintId: uuid("sprint_id").references(() => sprints.id, {
+      onDelete: "set null",
+    }),
     title: varchar("title", { length: 200 }).notNull(),
     description: varchar("description", { length: 2000 }),
     status: taskStatus("status").notNull().default("in_review"),
@@ -62,6 +67,7 @@ export const tasks = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
+    index("tasks_sprint_id_idx").on(table.sprintId),
     unique("tasks_project_number_unique").on(table.projectId, table.number),
     unique("tasks_project_key_unique").on(table.projectId, table.key),
   ]

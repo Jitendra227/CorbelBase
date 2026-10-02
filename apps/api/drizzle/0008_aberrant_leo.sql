@@ -1,0 +1,1 @@
+ALTER TABLE "task_comments" ADD COLUMN "is_edited" boolean DEFAULT false NOT NULL;

@@ -1,0 +1,1 @@
+CREATE INDEX "tasks_sprint_id_idx" ON "tasks" USING btree ("sprint_id");

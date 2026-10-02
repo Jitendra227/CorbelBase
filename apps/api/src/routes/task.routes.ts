@@ -1,15 +1,16 @@
 import { FastifyInstance } from "fastify";
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, isNull, or } from "drizzle-orm";
 
 import { database } from "../lib/database";
 import { errors } from "../lib/app-errors";
 import { validate } from "../lib/validate";
 import { authenticationMiddleware } from "../middleware/authentication.middleware";
 
-import { memberships, projects, tasks } from "../db/schema";
+import { memberships, projects, sprints, tasks } from "../db/schema";
 
 import {
   createTaskSchema,
+  taskListQuerySchema,
   taskParamsSchema,
   taskProjectParamsSchema,
   updateTaskSchema,
@@ -28,11 +29,8 @@ export async function taskRoutes(app: FastifyInstance) {
           errors.invalidProjectParams
         );
 
-        const { type, title, description, priority, assigneeId } = validate(
-          createTaskSchema,
-          request.body,
-          errors.invalidTaskData
-        );
+        const { type, title, description, priority, assigneeId, sprintId } =
+          validate(createTaskSchema, request.body, errors.invalidTaskData);
 
         const [project] = await database
           .select({
@@ -50,6 +48,22 @@ export async function taskRoutes(app: FastifyInstance) {
 
         if (!project) {
           throw errors.projectNotFound();
+        }
+
+        if (sprintId) {
+          const [sprint] = await database
+            .select({
+              id: sprints.id,
+            })
+            .from(sprints)
+            .where(
+              and(eq(sprints.id, sprintId), eq(sprints.projectId, projectId))
+            )
+            .limit(1);
+
+          if (!sprint) {
+            throw errors.invalidTaskData();
+          }
         }
 
         const [membership] = await database
@@ -112,6 +126,7 @@ export async function taskRoutes(app: FastifyInstance) {
             number: nextNumber,
             type,
             key: taskKey,
+            sprintId,
             title,
             description,
             priority,
@@ -134,6 +149,23 @@ export async function taskRoutes(app: FastifyInstance) {
           request.params,
           errors.invalidProjectParams
         );
+
+        const {
+          status,
+          priority,
+          sprintId,
+          search,
+          page,
+          limit,
+          sortBy,
+          sortOrder,
+        } = validate(
+          taskListQuerySchema,
+          request.query,
+          errors.invalidTaskData
+        );
+
+        const offset = (page - 1) * limit;
 
         const [project] = await database
           .select({
@@ -169,14 +201,58 @@ export async function taskRoutes(app: FastifyInstance) {
           throw errors.forbidden();
         }
 
+        const filters = [eq(tasks.projectId, projectId)];
+
+        if (search) {
+          filters.push(
+            or(
+              ilike(tasks.title, `%${search}%`),
+              ilike(tasks.key, `%${search}%`)
+            )!
+          );
+        }
+
+        if (status) {
+          filters.push(eq(tasks.status, status));
+        }
+        if (priority) {
+          filters.push(eq(tasks.priority, priority));
+        }
+        if (sprintId !== undefined) {
+          filters.push(
+            sprintId === null
+              ? isNull(tasks.sprintId)
+              : eq(tasks.sprintId, sprintId)
+          );
+        }
+
         const projectTasks = await database
           .select()
           .from(tasks)
-          .where(eq(tasks.projectId, projectId))
-          .orderBy(desc(tasks.number));
+          .where(and(...filters))
+          .orderBy(
+            sortOrder === "asc" ? asc(tasks[sortBy]) : desc(tasks[sortBy])
+          )
+          .limit(limit)
+          .offset(offset);
+
+        const [{ total }] = await database
+          .select({
+            total: count(),
+          })
+          .from(tasks)
+          .where(and(...filters));
+
+        const totalPages = Math.ceil(Number(total) / limit);
 
         return reply.send({
           tasks: projectTasks,
+          pagination: {
+            page,
+            limit,
+            total: Number(total),
+            totalPages,
+          },
         });
       }
     );
@@ -254,6 +330,25 @@ export async function taskRoutes(app: FastifyInstance) {
           request.body,
           errors.invalidTaskData
         );
+
+        if (updates.sprintId) {
+          const [sprint] = await database
+            .select({
+              id: sprints.id,
+            })
+            .from(sprints)
+            .where(
+              and(
+                eq(sprints.id, updates.sprintId),
+                eq(sprints.projectId, projectId)
+              )
+            )
+            .limit(1);
+
+          if (!sprint) {
+            throw errors.invalidTaskData();
+          }
+        }
 
         const [project] = await database
           .select({
