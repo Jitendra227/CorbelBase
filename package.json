@@ -1,11 +1,11 @@
 {
-  "name": "teamops",
+  "name": "corbelbase",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "private": true,
   "scripts": {
-    "dev": "pnpm --parallel --filter @teamops/web --filter @teamops/api dev",
+    "dev": "pnpm --parallel --filter @corbelbase/web --filter @corbelbase/api dev",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint"

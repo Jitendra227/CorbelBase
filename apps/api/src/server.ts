@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
+import cors from "@fastify/cors";
 
 import { healthRoutes } from "./routes/health.routes";
 import { registerErrorHandler } from "./middleware/error-handler.middleware";
@@ -17,6 +18,12 @@ const app = Fastify({
 registerErrorHandler(app);
 
 app.register(cookie);
+
+app.register(cors, {
+  origin: "http://localhost:3000",
+  credentials: true,
+});
+
 
 app.register(healthRoutes);
 
