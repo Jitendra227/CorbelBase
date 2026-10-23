@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { PATHS } from "@/config/paths";
 import type { Organization } from "@/lib/organizations/service";
+import CreateOrganizationForm from "./CreateOrganizationForm";
 
 interface OrganizationListProps {
   userName: string;
@@ -16,6 +17,8 @@ export default function OrganizationList({
     <section>
       <h1>Organizations</h1>
       <p>Welcome, {userName}!</p>
+
+      <CreateOrganizationForm />
 
       {organizations.length === 0 ? (
         <p>You don&apos;t belong to any organizations yet.</p>

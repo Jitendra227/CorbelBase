@@ -22,6 +22,7 @@ app.register(cookie);
 app.register(cors, {
   origin: "http://localhost:3000",
   credentials: true,
+  methods: ["GET", "HEAD", "POST", "PATCH", "DELETE", "OPTIONS"],
 });
 
 

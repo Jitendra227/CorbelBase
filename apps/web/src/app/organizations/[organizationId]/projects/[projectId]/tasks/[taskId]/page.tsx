@@ -1,3 +1,5 @@
+import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { getOrganization } from "@/lib/organizations/service";
 import { getTask, getTaskComments } from "@/lib/tasks/service";
 import TaskDetail from "@/ui/task/TaskDetail";
 
@@ -11,12 +13,22 @@ export default async function Page({
   }>;
 }) {
   const { organizationId, projectId, taskId } = await params;
-  const { task } = await getTask(organizationId, projectId, taskId);
-  const { comments } = await getTaskComments(
-    organizationId,
-    projectId,
-    taskId
-  );
 
-  return <TaskDetail task={task} comments={comments} />;
+  const [{ task }, { comments }, userResponse, organizationResponse] =
+    await Promise.all([
+      getTask(organizationId, projectId, taskId),
+      getTaskComments(organizationId, projectId, taskId),
+      getCurrentUser(),
+      getOrganization(organizationId),
+    ]);
+
+  return (
+    <TaskDetail
+      organizationId={organizationId}
+      task={task}
+      comments={comments}
+      currentUserId={userResponse.id}
+      organizationRole={organizationResponse.organization.role}
+    />
+  );
 }

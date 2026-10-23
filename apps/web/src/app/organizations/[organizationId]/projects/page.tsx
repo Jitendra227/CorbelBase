@@ -1,4 +1,5 @@
 import { getProjects } from "@/lib/projects/service";
+import CreateProjectForm from "@/ui/project/CreateProjectForm";
 import ProjectList from "@/ui/project/ProjectList";
 
 export default async function Page({
@@ -10,6 +11,9 @@ export default async function Page({
   const { projects } = await getProjects(organizationId);
 
   return (
-    <ProjectList organizationId={organizationId} projects={projects} />
+    <>
+      <CreateProjectForm organizationId={organizationId} />
+      <ProjectList organizationId={organizationId} projects={projects} />
+    </>
   );
 }

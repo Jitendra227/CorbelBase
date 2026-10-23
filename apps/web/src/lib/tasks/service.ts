@@ -22,6 +22,7 @@ export interface TaskComment {
   id: string;
   taskId: string;
   userId: string;
+  authorName: string;
   content: string;
   isEdited: boolean;
   createdAt: string;
@@ -30,6 +31,12 @@ export interface TaskComment {
 
 interface TasksResponse {
   tasks: Task[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 interface TaskResponse {

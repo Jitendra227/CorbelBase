@@ -6,7 +6,13 @@ import { errors } from "../lib/app-errors";
 import { validate } from "../lib/validate";
 import { authenticationMiddleware } from "../middleware/authentication.middleware";
 
-import { memberships, projects, taskComments, tasks } from "../db/schema";
+import {
+  memberships,
+  projects,
+  taskComments,
+  tasks,
+  users,
+} from "../db/schema";
 
 import {
   commentIdParamsSchema,
@@ -69,8 +75,18 @@ export async function commentRoutes(app: FastifyInstance) {
         }
 
         const comments = await database
-          .select()
+          .select({
+            id: taskComments.id,
+            taskId: taskComments.taskId,
+            userId: taskComments.userId,
+            authorName: users.name,
+            content: taskComments.content,
+            isEdited: taskComments.isEdited,
+            createdAt: taskComments.createdAt,
+            updatedAt: taskComments.updatedAt,
+          })
           .from(taskComments)
+          .innerJoin(users, eq(taskComments.userId, users.id))
           .where(eq(taskComments.taskId, taskId))
           .orderBy(taskComments.createdAt);
 

@@ -127,7 +127,7 @@ export async function sprintRoutes(app: FastifyInstance) {
       }
     );
 
-    app.get(
+    protectedRoutes.get(
       "/organizations/:organizationId/projects/:projectId/sprints/:sprintId/tasks",
       async (request) => {
         const params = validate(
