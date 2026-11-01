@@ -41,3 +41,29 @@ export function updateSprint(
     }
   );
 }
+
+export type SprintTaskDecision =
+  | {
+      taskId: string;
+      action: "close";
+    }
+  | {
+      taskId: string;
+      action: "rollover";
+      destinationSprintId: string;
+    };
+
+export function completeSprint(
+  organizationId: string,
+  projectId: string,
+  sprintId: string,
+  decisions: SprintTaskDecision[]
+) {
+  return apiClient<{ sprint: Sprint }>(
+    API_ENDPOINTS.sprints.complete(organizationId, projectId, sprintId),
+    {
+      method: "POST",
+      body: JSON.stringify({ decisions }),
+    }
+  );
+}

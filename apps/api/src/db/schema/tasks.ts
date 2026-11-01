@@ -53,6 +53,10 @@ export const tasks = pgTable(
     sprintId: uuid("sprint_id").references(() => sprints.id, {
       onDelete: "set null",
     }),
+    rolledOverFromSprintId: uuid("rolled_over_from_sprint_id").references(
+      () => sprints.id,
+      { onDelete: "set null" }
+    ),
     title: varchar("title", { length: 200 }).notNull(),
     description: varchar("description", { length: 2000 }),
     status: taskStatus("status").notNull().default("in_review"),

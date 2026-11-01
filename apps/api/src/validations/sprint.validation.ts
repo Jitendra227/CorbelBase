@@ -25,3 +25,19 @@ export const updateSprintSchema = z.object({
   startDate: z.iso.datetime().nullable().optional(),
   endDate: z.iso.datetime().nullable().optional(),
 });
+
+const sprintTaskDecisionSchema = z.discriminatedUnion("action", [
+  z.object({
+    taskId: z.uuid(),
+    action: z.literal("close"),
+  }),
+  z.object({
+    taskId: z.uuid(),
+    action: z.literal("rollover"),
+    destinationSprintId: z.uuid(),
+  }),
+]);
+
+export const completeSprintSchema = z.object({
+  decisions: z.array(sprintTaskDecisionSchema),
+});

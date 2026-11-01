@@ -12,6 +12,7 @@ export interface Task {
   status: string;
   priority: string;
   sprintId: string | null;
+  rolledOverFromSprintId: string | null;
   assigneeId: string | null;
   createdBy: string;
   createdAt: string;

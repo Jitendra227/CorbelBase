@@ -1,0 +1,2 @@
+ALTER TABLE "tasks" ADD COLUMN "rolled_over_from_sprint_id" uuid;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_rolled_over_from_sprint_id_sprints_id_fk" FOREIGN KEY ("rolled_over_from_sprint_id") REFERENCES "public"."sprints"("id") ON DELETE set null ON UPDATE no action;

@@ -8,7 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
-    "lint": "exec tsc --noEmit",
+    "lint": "tsc --noEmit",
     "testdb": "docker exec -it teamops-postgres psql -U \"teamops@345\" -d \"teamops@987\""
   },
   "keywords": [],

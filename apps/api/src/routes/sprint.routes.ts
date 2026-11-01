@@ -1,5 +1,5 @@
 import { FastifyInstance } from "fastify";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { database } from "../lib/database";
 import { errors } from "../lib/app-errors";
@@ -9,6 +9,7 @@ import { authenticationMiddleware } from "../middleware/authentication.middlewar
 import { memberships, projects, sprints, tasks } from "../db/schema";
 
 import {
+  completeSprintSchema,
   createSprintSchema,
   sprintParamsSchema,
   sprintProjectParamsSchema,
@@ -277,6 +278,10 @@ export async function sprintRoutes(app: FastifyInstance) {
           errors.invalidTaskData
         );
 
+        if (updates.status === "completed") {
+          throw errors.invalidTaskData();
+        }
+
         const [project] = await database
           .select({ id: projects.id })
           .from(projects)
@@ -434,6 +439,172 @@ export async function sprintRoutes(app: FastifyInstance) {
         await database.delete(sprints).where(eq(sprints.id, sprintId));
 
         return reply.status(204).send();
+      }
+    );
+
+    protectedRoutes.post(
+      "/organizations/:organizationId/projects/:projectId/sprints/:sprintId/complete",
+      async (request, reply) => {
+        const { organizationId, projectId, sprintId } = validate(
+          sprintParamsSchema,
+          request.params,
+          errors.invalidTaskParams
+        );
+
+        const { decisions } = validate(
+          completeSprintSchema,
+          request.body,
+          errors.invalidTaskData
+        );
+
+        const [project] = await database
+          .select({ id: projects.id })
+          .from(projects)
+          .where(
+            and(
+              eq(projects.id, projectId),
+              eq(projects.organizationId, organizationId)
+            )
+          )
+          .limit(1);
+
+        if (!project) {
+          throw errors.projectNotFound();
+        }
+
+        const [membership] = await database
+          .select({ id: memberships.id, role: memberships.role })
+          .from(memberships)
+          .where(
+            and(
+              eq(memberships.organizationId, organizationId),
+              eq(memberships.userId, request.user.id)
+            )
+          )
+          .limit(1);
+
+        if (!membership) {
+          throw errors.forbidden();
+        }
+
+        if (membership.role === "viewer") {
+          throw errors.forbidden("Viewers cannot complete sprints");
+        }
+
+        const decisionIds = decisions.map((decision) => decision.taskId);
+
+        if (new Set(decisionIds).size !== decisionIds.length) {
+          throw errors.invalidTaskData();
+        }
+
+        const result = await database.transaction(async (tx) => {
+          const [sprint] = await tx
+            .select()
+            .from(sprints)
+            .where(
+              and(eq(sprints.id, sprintId), eq(sprints.projectId, projectId))
+            )
+            .for("update")
+            .limit(1);
+
+          if (!sprint) {
+            throw errors.taskNotFound();
+          }
+
+          if (sprint.status !== "active") {
+            throw errors.invalidTaskData();
+          }
+
+          const sprintTasks = await tx
+            .select()
+            .from(tasks)
+            .where(eq(tasks.sprintId, sprintId))
+            .for("update");
+
+          const unfinishedTasks = sprintTasks.filter(
+            (task) => task.status !== "done" && task.status !== "closed"
+          );
+
+          const unfinishedIds = new Set(unfinishedTasks.map((task) => task.id));
+
+          if (
+            decisionIds.length !== unfinishedIds.size ||
+            decisionIds.some((id) => !unfinishedIds.has(id))
+          ) {
+            throw errors.invalidTaskData();
+          }
+
+          const destinationIds = decisions
+            .filter((decision) => decision.action === "rollover")
+            .map((decision) => decision.destinationSprintId);
+
+          if (destinationIds.includes(sprintId)) {
+            throw errors.invalidTaskData();
+          }
+
+          if (destinationIds.length > 0) {
+            const destinations = await tx
+              .select({
+                id: sprints.id,
+                status: sprints.status,
+              })
+              .from(sprints)
+              .where(
+                and(
+                  eq(sprints.projectId, projectId),
+                  inArray(sprints.id, destinationIds)
+                )
+              );
+
+            const validDestinations = new Set(
+              destinations
+                .filter(
+                  (destination) =>
+                    destination.status === "planned" ||
+                    destination.status === "active"
+                )
+                .map((destination) => destination.id)
+            );
+
+            if (destinationIds.some((id) => !validDestinations.has(id))) {
+              throw errors.invalidTaskData();
+            }
+          }
+
+          for (const decision of decisions) {
+            if (decision.action === "close") {
+              await tx
+                .update(tasks)
+                .set({
+                  status: "closed",
+                  updatedAt: new Date(),
+                })
+                .where(eq(tasks.id, decision.taskId));
+            } else {
+              await tx
+                .update(tasks)
+                .set({
+                  sprintId: decision.destinationSprintId,
+                  rolledOverFromSprintId: sprintId,
+                  updatedAt: new Date(),
+                })
+                .where(eq(tasks.id, decision.taskId));
+            }
+          }
+
+          const [completedSprint] = await tx
+            .update(sprints)
+            .set({
+              status: "completed",
+              updatedAt: new Date(),
+            })
+            .where(eq(sprints.id, sprintId))
+            .returning();
+
+          return completedSprint;
+        });
+
+        return reply.send({ sprint: result });
       }
     );
   });

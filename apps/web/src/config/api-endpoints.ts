@@ -48,5 +48,7 @@ export const API_ENDPOINTS = {
       `/organizations/${organizationId}/projects/${projectId}/sprints/${sprintId}`,
     tasks: (organizationId: string, projectId: string, sprintId: string) =>
       `/organizations/${organizationId}/projects/${projectId}/sprints/${sprintId}/tasks`,
+    complete: (organizationId: string, projectId: string, sprintId: string) =>
+      `/organizations/${organizationId}/projects/${projectId}/sprints/${sprintId}/complete`,
   },
 } as const;

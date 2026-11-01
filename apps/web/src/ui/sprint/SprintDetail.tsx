@@ -4,17 +4,23 @@ import { useState, type SyntheticEvent } from "react";
 import { useRouter } from "next/navigation";
 
 import type { Sprint } from "@/lib/sprints/service";
-import { updateSprint } from "@/lib/sprints/sprintService";
+import { completeSprint, updateSprint } from "@/lib/sprints/sprintService";
 import type { Task } from "@/lib/tasks/service";
+import type { SprintTaskDecision } from "@/lib/sprints/sprintService";
 import { updateTask } from "@/lib/tasks/taskService";
 
 interface SprintDetailProps {
   sprint: Sprint;
   tasks: Task[];
   unassignedTasks: Task[];
+  sprints: Sprint[];
   organizationId: string;
   projectId: string;
 }
+
+type TaskDecision =
+  | { action: "close" }
+  | { action: "rollover"; destinationSprintId: string };
 
 export default function SprintDetail({
   sprint,
@@ -22,6 +28,7 @@ export default function SprintDetail({
   organizationId,
   projectId,
   unassignedTasks,
+  sprints,
 }: SprintDetailProps) {
   const router = useRouter();
 
@@ -37,6 +44,41 @@ export default function SprintDetail({
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
   const [assignmentError, setAssignmentError] = useState("");
+
+  const [decisions, setDecisions] = useState<Record<string, TaskDecision>>({});
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [completionError, setCompletionError] = useState("");
+
+  const unfinishedTasks = tasks.filter(
+    (task) => task.status !== "done" && task.status !== "closed"
+  );
+
+  const destinationSprints = sprints.filter(
+    (item) =>
+      item.id !== sprint.id &&
+      (item.status === "planned" || item.status === "active")
+  );
+
+  const completedTasks = tasks.filter(
+    (task) => task.status === "done" || task.status === "closed"
+  ).length;
+
+  const totalTasks = tasks.length;
+
+  const completionPercentage =
+    totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+
+  const statusCounts = [
+    { label: "To do", statuses: ["reopened"] },
+    { label: "In progress", statuses: ["in_progress"] },
+    { label: "In review", statuses: ["in_review"] },
+    { label: "Testing", statuses: ["test_ready", "testing"] },
+    { label: "Completed", statuses: ["done", "closed"] },
+    { label: "Abandoned", statuses: ["abandoned"] },
+  ].map(({ label, statuses }) => ({
+    label,
+    count: tasks.filter((task) => statuses.includes(task.status)).length,
+  }));
 
   async function handleSubmit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -89,9 +131,188 @@ export default function SprintDetail({
     }
   }
 
+  async function handleCompleteSprint() {
+    setCompletionError("");
+
+    const missingDecision = unfinishedTasks.some((task) => {
+      const decision = decisions[task.id];
+
+      return (
+        !decision ||
+        (decision.action === "rollover" && !decision.destinationSprintId)
+      );
+    });
+
+    if (missingDecision) {
+      setCompletionError("Choose an action for every unfinished task.");
+      return;
+    }
+
+    const payload: SprintTaskDecision[] = unfinishedTasks.map((task) => {
+      const decision = decisions[task.id];
+
+      if (decision.action === "close") {
+        return {
+          taskId: task.id,
+          action: "close",
+        };
+      }
+
+      return {
+        taskId: task.id,
+        action: "rollover",
+        destinationSprintId: decision.destinationSprintId,
+      };
+    });
+
+    setIsCompleting(true);
+
+    try {
+      await completeSprint(organizationId, projectId, sprint.id, payload);
+
+      router.refresh();
+    } catch (err) {
+      setCompletionError(
+        err instanceof Error ? err.message : "Failed to complete sprint."
+      );
+    } finally {
+      setIsCompleting(false);
+    }
+  }
+
   return (
     <section>
       <h1>{sprint.name}</h1>
+
+      <section>
+        <h2>Sprint progress</h2>
+
+        <p>
+          {completedTasks} of {totalTasks} tasks completed
+        </p>
+
+        <progress
+          value={completionPercentage}
+          max={100}
+          aria-label="Sprint completion"
+        />
+
+        <p>{completionPercentage}% complete</p>
+
+        <ul>
+          {statusCounts.map(({ label, count }) => (
+            <li key={label}>
+              {label}: {count}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {sprint.status === "active" && (
+        <section>
+          <h2>Complete sprint</h2>
+
+          <p>{unfinishedTasks.length} unfinished tasks need a decision.</p>
+
+          {unfinishedTasks.length > 0 && (
+            <ul>
+              {unfinishedTasks.map((task) => {
+                const decision = decisions[task.id];
+
+                return (
+                  <li key={task.id}>
+                    <strong>{task.key}</strong> — {task.title}
+                    <div>
+                      <label htmlFor={`decision-${task.id}`}>Action</label>
+
+                      <select
+                        id={`decision-${task.id}`}
+                        value={decision?.action ?? ""}
+                        onChange={(event) => {
+                          const action = event.target.value;
+
+                          setDecisions((current) => {
+                            const next = { ...current };
+
+                            if (action === "close") {
+                              next[task.id] = { action: "close" };
+                            } else if (action === "rollover") {
+                              next[task.id] = {
+                                action: "rollover",
+                                destinationSprintId: "",
+                              };
+                            } else {
+                              delete next[task.id];
+                            }
+
+                            return next;
+                          });
+                        }}
+                      >
+                        <option value="">Choose action</option>
+                        <option value="close">Close task</option>
+                        <option
+                          value="rollover"
+                          disabled={destinationSprints.length === 0}
+                        >
+                          Roll over
+                        </option>
+                      </select>
+
+                      {decision?.action === "rollover" && (
+                        <>
+                          <label htmlFor={`destination-${task.id}`}>
+                            Destination sprint
+                          </label>
+
+                          <select
+                            id={`destination-${task.id}`}
+                            value={decision.destinationSprintId}
+                            onChange={(event) => {
+                              setDecisions((current) => ({
+                                ...current,
+                                [task.id]: {
+                                  action: "rollover",
+                                  destinationSprintId: event.target.value,
+                                },
+                              }));
+                            }}
+                          >
+                            <option value="">Choose destination</option>
+
+                            {destinationSprints.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.name} ({item.status})
+                              </option>
+                            ))}
+                          </select>
+                        </>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {completionError && <p role="alert">{completionError}</p>}
+
+          <button
+            type="button"
+            onClick={handleCompleteSprint}
+            disabled={
+              isCompleting ||
+              (unfinishedTasks.length > 0 &&
+                destinationSprints.length === 0 &&
+                unfinishedTasks.some(
+                  (task) => decisions[task.id]?.action === "rollover"
+                ))
+            }
+          >
+            {isCompleting ? "Completing..." : "Complete Sprint"}
+          </button>
+        </section>
+      )}
 
       <form onSubmit={handleSubmit}>
         <label htmlFor="sprint-name">Sprint name</label>
@@ -123,7 +344,9 @@ export default function SprintDetail({
         >
           <option value="planned">Planned</option>
           <option value="active">Active</option>
-          <option value="completed">Completed</option>
+          <option value="completed" disabled>
+            Completed (use Complete Sprint)
+          </option>
           <option value="cancelled">Cancelled</option>
         </select>
 
@@ -162,6 +385,20 @@ export default function SprintDetail({
                 <strong>{task.key}</strong> — {task.title}
                 <span> | {task.status}</span>
                 <span> | {task.priority}</span>
+                {task.rolledOverFromSprintId && (
+                  <span
+                    style={{
+                      marginLeft: "8px",
+                      padding: "2px 6px",
+                      borderRadius: "4px",
+                      backgroundColor: "#fff3cd",
+                      color: "#856404",
+                      fontSize: "12px",
+                    }}
+                  >
+                    Rolled over
+                  </span>
+                )}
               </li>
             ))}
           </ul>
