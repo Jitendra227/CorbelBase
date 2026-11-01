@@ -4,7 +4,7 @@ import { PATHS } from "@/config/paths";
 import type { Organization } from "@/lib/organizations/service";
 import CreateOrganizationForm from "./CreateOrganizationForm";
 
-import styles from "./organizationList.module.scss";
+import styles from "./styles/organizationList.module.scss";
 
 interface OrganizationListProps {
   userName: string;
@@ -47,13 +47,26 @@ export default function OrganizationList({
                 className={styles.card}
               >
                 <div className={styles.cardHeader}>
-                  <h3>{organization.name}</h3>
+                  <div className={styles.organizationIdentity}>
+                    <span className={styles.organizationMark}>
+                      {organization.name.charAt(0).toUpperCase()}
+                    </span>
+
+                    <div>
+                      <h3>{organization.name}</h3>
+                      <span className={styles.organizationLabel}>
+                        Organization
+                      </span>
+                    </div>
+                  </div>
+
                   <span className={styles.role}>{organization.role}</span>
                 </div>
 
-                <p className={styles.cardAction}>
-                  Open organization <span aria-hidden="true">→</span>
-                </p>
+                <div className={styles.cardFooter}>
+                  <span>View workspace</span>
+                  <span aria-hidden="true">→</span>
+                </div>
               </Link>
             ))}
           </div>

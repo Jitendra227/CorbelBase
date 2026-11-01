@@ -1,35 +1,53 @@
 .container {
-  max-width: 1000px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 32px 24px;
+  padding: 16px 12px;
 }
 
 .header {
-  margin-bottom: 32px;
+  margin-bottom: 22px;
 
   h1 {
-    font-size: 24px;
+    margin: 0;
+    font-size: 22px;
     font-weight: 600;
   }
 
   p {
-    margin-top: 6px;
+    margin-top: 4px;
     color: var(--color-text-muted);
   }
 }
 
 .createSection {
-  padding: 24px;
+  padding: 18px 20px;
+  margin-bottom: 24px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-bg);
-  margin-bottom: 32px;
 
   h2 {
-    font-size: 18px;
-    font-weight: 500;
-    margin-bottom: 16px;
+    margin: 0 0 14px;
+    font-size: 16px;
+    font-weight: 600;
   }
+}
+
+.organizationsSection {
+  .sectionHeader {
+    margin-bottom: 12px;
+
+    h2 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+  }
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
 }
 
 .organizationsSection {
@@ -51,24 +69,23 @@
   }
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
 .card {
-  display: block;
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 120px;
+  padding: 16px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-bg);
   color: var(--color-text);
-  transition: border-color 150ms ease, background-color 150ms ease;
+  transition: border-color 150ms ease, background-color 150ms ease,
+    transform 150ms ease;
 
   &:hover {
     border-color: var(--color-primary);
     background: var(--color-surface);
+    transform: translateY(-2px);
   }
 
   &:focus-visible {
@@ -82,11 +99,41 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.organizationIdentity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 
   h3 {
+    overflow: hidden;
+    margin: 0;
     font-size: 15px;
     font-weight: 600;
+    text-overflow: ellipsis;
   }
+}
+
+.organizationMark {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 10px;
+  background: #eaf0ff;
+  color: var(--color-primary);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.organizationLabel {
+  display: block;
+  margin-top: 3px;
+  color: var(--color-text-muted);
+  font-size: 12px;
 }
 
 .role {
@@ -98,6 +145,18 @@
   text-transform: capitalize;
   white-space: nowrap;
 }
+
+.cardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
 
 .cardAction {
   margin-top: 24px;

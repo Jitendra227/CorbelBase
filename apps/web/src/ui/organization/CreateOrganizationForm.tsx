@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 
 import { createOrganization } from "@/lib/organizations/organizationService";
 
+import styles from "./styles/createOrganizationForm.module.scss";
+
 export default function CreateOrganizationForm() {
   const router = useRouter();
 
@@ -31,23 +33,34 @@ export default function CreateOrganizationForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <label htmlFor="organization-name">Organization name</label>
-      <input
-        id="organization-name"
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        maxLength={100}
-        required
-        disabled={isSubmitting}
-        placeholder="e.g. Engineering Team"
-      />
+    <form className={styles.form} onSubmit={handleSubmit}>
+      <div className={styles.field}>
+        <label htmlFor="organization-name">Organization name</label>
 
-      <button type="submit" disabled={isSubmitting || !name.trim()}>
+        <input
+          id="organization-name"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          maxLength={100}
+          required
+          disabled={isSubmitting}
+          placeholder="e.g. Engineering Team"
+        />
+      </div>
+
+      <button
+        className={styles.button}
+        type="submit"
+        disabled={isSubmitting || !name.trim()}
+      >
         {isSubmitting ? "Creating..." : "Create organization"}
       </button>
 
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
     </form>
   );
 }
