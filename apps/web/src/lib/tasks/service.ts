@@ -72,3 +72,27 @@ export function getTaskComments(
     API_ENDPOINTS.comments.list(organizationId, projectId, taskId)
   );
 }
+
+export async function getUnassignedTasks(
+  organizationId: string,
+  projectId: string
+) {
+  const firstPage = await serverApiClient<TasksResponse>(
+    `${API_ENDPOINTS.tasks.list(organizationId, projectId)}?limit=100&page=1`
+  );
+
+  const allTasks = [...firstPage.tasks];
+
+  for (let page = 2; page <= firstPage.pagination.totalPages; page++) {
+    const response = await serverApiClient<TasksResponse>(
+      `${API_ENDPOINTS.tasks.list(
+        organizationId,
+        projectId
+      )}?limit=100&page=${page}`
+    );
+
+    allTasks.push(...response.tasks);
+  }
+
+  return allTasks.filter((task) => task.sprintId === null);
+}

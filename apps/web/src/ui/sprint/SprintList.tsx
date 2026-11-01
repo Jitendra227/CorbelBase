@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { PATHS } from "@/config/paths";
 import type { Sprint } from "@/lib/sprints/service";
+import CreateSprintForm from "./CreateSprintForm";
 
 interface SprintListProps {
   organizationId: string;
@@ -32,6 +33,7 @@ export default function SprintList({
           ))}
         </ul>
       )}
+      <CreateSprintForm organizationId={organizationId} projectId={projectId} />
     </section>
   );
 }

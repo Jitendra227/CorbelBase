@@ -9,6 +9,7 @@ import {
   updateTaskComment,
   deleteTaskComment,
 } from "@/lib/tasks/taskService";
+import { Sprint } from "@/lib/sprints/service";
 
 interface TaskDetailProps {
   organizationId: string;
@@ -16,6 +17,7 @@ interface TaskDetailProps {
   comments: TaskComment[];
   currentUserId: string;
   organizationRole: "owner" | "admin" | "developer" | "viewer";
+  sprints: Sprint[];
 }
 
 const statuses = [
@@ -37,6 +39,7 @@ export default function TaskDetail({
   comments,
   currentUserId,
   organizationRole,
+  sprints,
 }: TaskDetailProps) {
   const [status, setStatus] = useState<(typeof statuses)[number]>(
     task.status as (typeof statuses)[number]
@@ -53,6 +56,7 @@ export default function TaskDetail({
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
   const [commentActionError, setCommentActionError] = useState("");
+  const [sprintId, setSprintId] = useState(task.sprintId ?? "");
 
   async function handleSave() {
     setSaving(true);
@@ -62,6 +66,7 @@ export default function TaskDetail({
       await updateTask(organizationId, task.projectId, task.id, {
         status,
         priority,
+        sprintId: sprintId || null,
       });
       setMessage("Task updated successfully.");
     } catch (error) {
@@ -183,11 +188,32 @@ export default function TaskDetail({
         </select>
       </div>
 
+      <div>
+        <label htmlFor="task-sprint">Sprint</label>
+
+        <select
+          id="task-sprint"
+          value={sprintId}
+          onChange={(event) => setSprintId(event.target.value)}
+        >
+          <option value="">No sprint</option>
+
+          {sprints.map((sprint) => (
+            <option key={sprint.id} value={sprint.id}>
+              {sprint.name} ({sprint.status})
+            </option>
+          ))}
+        </select>
+      </div>
+
       <button
         type="button"
         onClick={handleSave}
         disabled={
-          saving || (status === task.status && priority === task.priority)
+          saving ||
+          (status === task.status &&
+            priority === task.priority &&
+            sprintId === (task.sprintId ?? ""))
         }
       >
         {saving ? "Saving..." : "Save changes"}

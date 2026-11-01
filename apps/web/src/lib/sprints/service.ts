@@ -1,5 +1,6 @@
 import { API_ENDPOINTS } from "@/config/api-endpoints";
 import { serverApiClient } from "@/lib/api/server-client";
+import { Task } from "../tasks/service";
 
 export interface Sprint {
   id: string;
@@ -34,5 +35,15 @@ export function getSprint(
 ) {
   return serverApiClient<SprintResponse>(
     API_ENDPOINTS.sprints.one(organizationId, projectId, sprintId)
+  );
+}
+
+export function getSprintTasks(
+  organizationId: string,
+  projectId: string,
+  sprintId: string
+) {
+  return serverApiClient<Task[]>(
+    API_ENDPOINTS.sprints.tasks(organizationId, projectId, sprintId)
   );
 }

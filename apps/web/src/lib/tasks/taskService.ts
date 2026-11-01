@@ -39,7 +39,8 @@ export function updateTask(
       | "closed"
       | "abandoned"
       | "reopened";
-    priority?: "low" | "medium" | "high" | "critical";
+    priority?: "low" | "medium" | "high" | "critical"
+    sprintId?: string | null;
   }
 ) {
   return apiClient<{ task: Task }>(

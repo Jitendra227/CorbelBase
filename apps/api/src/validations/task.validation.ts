@@ -43,7 +43,7 @@ export const updateTaskSchema = z.object({
 
   priority: z.enum(["low", "medium", "high", "critical"]).optional(),
   assigneeId: z.uuid().nullable().optional(),
-  sprintId: z.uuid().optional(),
+  sprintId: z.uuid().nullable().optional(),
 });
 
 export const taskListQuerySchema = z.object({
