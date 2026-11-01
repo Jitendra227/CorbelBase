@@ -27,13 +27,13 @@
 
 .brandMark {
   display: grid;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
   place-items: center;
-  border-radius: 10px;
+  border-radius: 9px;
   background: var(--color-primary);
   color: white;
-  font-size: 18px;
 }
 
 .navSection {
@@ -58,9 +58,11 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 12px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   color: var(--color-text-muted);
+  font-size: 13px;
   font-weight: 500;
   transition: background 150ms ease, color 150ms ease;
 
@@ -70,10 +72,16 @@
   }
 }
 
-.navIcon {
-  width: 20px;
-  text-align: center;
-  font-size: 17px;
+.active {
+  background: #eaf0ff;
+  border-color: #dbe6ff;
+  color: var(--color-primary);
+  font-weight: 600;
+
+  &:hover {
+    background: #eaf0ff;
+    color: var(--color-primary);
+  }
 }
 
 .sidebarFooter {
@@ -90,12 +98,20 @@
 
 .topbar {
   display: flex;
-  min-height: 72px;
+  height: 48px;
+  min-height: 48px;
   align-items: center;
   justify-content: space-between;
-  padding: 0 36px;
+  gap: 16px;
+  padding: 0 24px;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg);
+}
+
+.search {
+  width: 35%;
+  max-width: 420px;
+  min-width: 180px;
 }
 
 .topbarTitle {
@@ -185,8 +201,12 @@
   }
 
   .topbar {
-    min-height: 58px;
-    padding: 0 18px;
+    padding: 0 16px;
+  }
+  
+  .search {
+    min-width: 0;
+    width: 35%;
   }
 
   .pageContent {
